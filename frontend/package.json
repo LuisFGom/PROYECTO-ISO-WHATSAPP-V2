@@ -10,10 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.17.6",
     "axios": "^1.6.5",
+    "lottie-react": "^2.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.1",
+    "socket.io-client": "^4.8.1",
     "zustand": "^4.4.7"
   },
   "devDependencies": {

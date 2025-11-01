@@ -1,15 +1,23 @@
 // backend/src/index.ts
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
 import { config } from './config/environment';
 import { database } from './infrastructure/database/mysql/connection';
 import routes from './presentation/routes';
 import { errorMiddleware } from './presentation/middlewares/error.middleware';
+import { initializeSocket } from './infrastructure/socket/socket'; // 🔥 CAMBIADO
 
 const app = express();
 
+// 🔥 Crear servidor HTTP para Socket.IO
+const httpServer = createServer(app);
+
 // Middlewares
-app.use(cors({ origin: config.cors.origin }));
+app.use(cors({ 
+  origin: config.cors.origin,
+  credentials: true 
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -45,11 +53,16 @@ app.use('/api', routes);
 // Error handler middleware (debe ir al final)
 app.use(errorMiddleware);
 
-// Iniciar servidor
-app.listen(config.port, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${config.port}`);
-  console.log(`📍 http://localhost:${config.port}`);
-  console.log(`🌍 Environment: ${config.nodeEnv}`);
+// 🔥 Inicializar Socket.IO
+const socketService = initializeSocket(httpServer);
+console.log('🔌 Socket.IO inicializado');
+
+// 🔥 Iniciar servidor con HTTP (para Socket.IO)
+httpServer.listen(config.port, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${config.port}`); // 🔥 CORREGIDO
+  console.log(`📍 http://localhost:${config.port}`); // 🔥 CORREGIDO
+  console.log(`🌍 Environment: ${config.nodeEnv}`); // 🔥 CORREGIDO
+  console.log(`🔌 Socket.IO ready`); // 🔥 CORREGIDO
 });
 
 // Manejo de errores no capturados
