@@ -6,7 +6,7 @@ import { config } from './config/environment';
 import { database } from './infrastructure/database/mysql/connection';
 import routes from './presentation/routes';
 import { errorMiddleware } from './presentation/middlewares/error.middleware';
-import { initializeSocket } from './infrastructure/socket/socket'; // 🔥 CAMBIADO
+import { initializeSocket } from './infrastructure/socket/socket';
 
 const app = express();
 
@@ -36,7 +36,26 @@ app.get('/health', async (req, res) => {
     await database.query('SELECT 1');
     res.json({ 
       status: 'healthy',
-      database: 'connected' 
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'unhealthy',
+      database: 'disconnected',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// 🔥 Health check sin autenticación (para el frontend)
+app.get('/api/health', async (req, res) => {
+  try {
+    await database.query('SELECT 1');
+    res.json({ 
+      status: 'healthy',
+      database: 'connected',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({ 
@@ -59,10 +78,10 @@ console.log('🔌 Socket.IO inicializado');
 
 // 🔥 Iniciar servidor con HTTP (para Socket.IO)
 httpServer.listen(config.port, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${config.port}`); // 🔥 CORREGIDO
-  console.log(`📍 http://localhost:${config.port}`); // 🔥 CORREGIDO
-  console.log(`🌍 Environment: ${config.nodeEnv}`); // 🔥 CORREGIDO
-  console.log(`🔌 Socket.IO ready`); // 🔥 CORREGIDO
+  console.log(`🚀 Server running on port ${config.port}`);
+  console.log(`📍 http://localhost:${config.port}`);
+  console.log(`🌍 Environment: ${config.nodeEnv}`);
+  console.log(`🔌 Socket.IO ready`);
 });
 
 // Manejo de errores no capturados

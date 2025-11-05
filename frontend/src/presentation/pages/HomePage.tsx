@@ -1,79 +1,192 @@
 // frontend/src/presentation/pages/HomePage.tsx
-import { useSocket } from '../hooks/useSocket';
-import { ReconnectingOverlay } from '../components/ReconnectingOverlay';
+import { useState } from 'react';
 import { UserMenu } from '../components/UserMenu';
+import { AddContactModal } from '../components/AddContactModal';
+import { ContactList } from '../components/ContactList';
+import { useSocketStatus } from '../hooks/useSocketStatus';
+import { useContacts, type Contact } from '../hooks/useContacts';
 
 export const HomePage = () => {
-  // 🔌 Hook de Socket.IO
-  const { isConnected, isReconnecting, reconnectAttempt } = useSocket();
+  const { isConnected } = useSocketStatus();
+
+  // 🔧 Aseguramos valores por defecto para evitar undefined
+  const {
+    contacts = [],
+    isLoading = false,
+    refreshContacts,
+    deleteContact,
+    updateNickname,
+    searchContacts,
+  } = useContacts() || {};
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // 🔧 Verificamos que searchContacts sea una función antes de usarla
+  const filteredContacts = typeof searchContacts === 'function'
+    ? searchContacts(searchQuery) ?? []
+    : [];
+
+  const handleContactSelect = (contact: Contact) => {
+    setSelectedContact(contact);
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
+  };
+
+  const handleBackToChats = () => {
+    setSelectedContact(null);
+    setIsSidebarOpen(true);
+  };
+
+  const handleEditContact = async (contactId: number, nickname: string) => {
+    const result = await updateNickname(contactId, nickname);
+    if (!result.success) alert(result.error);
+  };
+
+  const handleDeleteContact = async (contactId: number) => {
+    const result = await deleteContact(contactId);
+    if (!result.success) alert(result.error);
+    if (selectedContact?.id === contactId) setSelectedContact(null);
+  };
 
   return (
     <>
-      {/* 🔥 OVERLAY DE RECONEXIÓN */}
-      <ReconnectingOverlay 
-        isVisible={isReconnecting} 
-        attempt={reconnectAttempt} 
-      />
-
-      {/* TU INTERFAZ PRINCIPAL */}
-      <div className="flex h-screen bg-gray-100">
+      <div className="flex h-screen bg-gray-100 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-1/3 bg-white border-r border-gray-300">
+        <div
+          className={`
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            md:translate-x-0 fixed md:relative
+            w-full md:w-1/3 lg:w-1/4
+            h-full bg-white border-r border-gray-300
+            transition-transform duration-300 ease-in-out z-20
+          `}
+        >
           {/* Header */}
           <div className="h-16 bg-whatsapp-teal flex items-center justify-between px-4">
             <h1 className="text-white text-xl font-semibold">WhatsApp</h1>
-            
-            {/* 🔥 MENÚ DE USUARIO */}
             <div className="flex items-center gap-4">
-              {/* Indicador de conexión */}
               {isConnected ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                   <span className="text-white text-xs">Online</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+                  <div className="w-2 h-2 bg-red-400 rounded-full" />
                   <span className="text-white text-xs">Desconectado</span>
                 </div>
               )}
-
-              {/* Menú de usuario */}
               <UserMenu />
             </div>
           </div>
 
-          {/* Lista de chats */}
-          <div className="overflow-y-auto h-[calc(100vh-64px)]">
-            <div className="p-4">
-              <h2 className="text-gray-600 text-sm font-medium mb-3">Chats recientes</h2>
-              
-              {/* Aquí irán tus contactos/chats */}
-              <div className="space-y-2">
-                {/* Ejemplo de chat */}
-                <div className="flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg cursor-pointer">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold">U</span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-800">Usuario 1</h3>
-                    <p className="text-sm text-gray-500 truncate">Último mensaje...</p>
-                  </div>
-                  <div className="text-xs text-gray-400">12:30</div>
-                </div>
+          {/* Buscador */}
+          <div className="p-3 border-b border-gray-200">
+            <input
+              type="text"
+              placeholder="Buscar contacto..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-whatsapp-green"
+            />
+          </div>
+
+          {/* Lista de contactos / Loading */}
+          <div className="overflow-y-auto h-[calc(100vh-112px)] p-2">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <svg
+                  className="animate-spin h-6 w-6 mr-2 text-gray-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8z"
+                  />
+                </svg>
+                <span className="text-gray-600">Cargando contactos...</span>
               </div>
-            </div>
+            ) : (
+              <ContactList
+                contacts={
+                  Array.isArray(filteredContacts) && filteredContacts.length > 0
+                    ? filteredContacts
+                    : Array.isArray(contacts)
+                    ? contacts
+                    : []
+                }
+                onContactClick={handleContactSelect}
+                onDeleteContact={handleDeleteContact}
+                onEditContact={handleEditContact}
+              />
+            )}
+          </div>
+
+          {/* Botón agregar contacto */}
+          <div className="absolute bottom-6 right-6">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              disabled={isLoading}
+              className={`p-4 rounded-full shadow-lg transition ${
+                isLoading
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  : 'bg-whatsapp-green text-white hover:bg-whatsapp-green-dark'
+              }`}
+            >
+              +
+            </button>
           </div>
         </div>
 
         {/* Área de chat */}
-        <div className="flex-1 flex flex-col">
-          {/* Header del chat */}
+        <div
+          className={`
+            ${!isSidebarOpen || selectedContact ? 'flex' : 'hidden md:flex'}
+            flex-1 flex-col w-full
+          `}
+        >
           <div className="h-16 bg-gray-200 border-b border-gray-300 flex items-center px-4">
+            {selectedContact && (
+              <button
+                onClick={handleBackToChats}
+                className="md:hidden mr-3 p-2 hover:bg-gray-300 rounded-full transition"
+              >
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+            )}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-400 rounded-full"></div>
+              <div className="w-10 h-10 bg-gray-400 rounded-full" />
               <div>
-                <h2 className="font-semibold text-gray-800">Selecciona un chat</h2>
+                <h2 className="font-semibold text-gray-800">
+                  {selectedContact
+                    ? selectedContact.nickname ?? selectedContact.user.username
+                    : 'Selecciona un chat'}
+                </h2>
                 <p className="text-xs text-gray-500">
                   {isConnected ? 'Conectado' : 'Esperando conexión...'}
                 </p>
@@ -81,26 +194,36 @@ export const HomePage = () => {
             </div>
           </div>
 
-          {/* Mensajes */}
           <div className="flex-1 bg-[#e5ddd5] p-4 overflow-y-auto">
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className="text-6xl mb-4">💬</div>
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                  WhatsApp Web
-                </h3>
-                <p className="text-gray-500">
-                  Selecciona un chat para comenzar a conversar
+            {!selectedContact ? (
+              <div className="flex items-center justify-center h-full text-center">
+                <div>
+                  <div className="text-6xl mb-4">💬</div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    WhatsApp Web
+                  </h3>
+                  <p className="text-gray-500">
+                    Selecciona un chat para comenzar
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-center text-gray-500 text-sm">
+                  Carga tus mensajes aquí
                 </p>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Input de mensaje */}
           <div className="h-16 bg-gray-200 border-t border-gray-300 flex items-center px-4 gap-3">
             <input
               type="text"
-              placeholder={isConnected ? "Escribe un mensaje..." : "Esperando conexión..."}
+              placeholder={
+                isConnected
+                  ? 'Escribe un mensaje...'
+                  : 'Esperando conexión...'
+              }
               disabled={!isConnected}
               className="flex-1 px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:border-whatsapp-green disabled:bg-gray-100 disabled:cursor-not-allowed"
             />
@@ -126,6 +249,12 @@ export const HomePage = () => {
           </div>
         </div>
       </div>
+
+      <AddContactModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onContactAdded={refreshContacts}
+      />
     </>
   );
 };
